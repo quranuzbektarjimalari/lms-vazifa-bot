@@ -200,22 +200,21 @@ def find_today_assignments(session, start_id=6343, end_id=6643):
 
 # === 9. Telegram xabar yuborish ===
 async def send_today_deadlines(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    fullname = user.full_name
-
-    await update.message.reply_text("🙋‍♂️ Bugungi deadlinelar tekshirilmoqda...")
+    chat = update.effective_chat
+    
+    await context.bot.send_message(chat_id=chat.id, text="🙋‍♂️ Bugungi deadlinelar tekshirilmoqda...")
 
     # 👇 Bu joyda o‘z login-parolingizni kiriting
     session, _, err = login_to_lms("user2200420", "70386881")
     if not session:
-        await update.message.reply_text(f"❌ LMS ga kirishda xato: {err}")
+        await context.bot.send_message(chat_id=chat.id, text=f"❌ LMS ga kirishda xato: {err}")
         return
 
     tests = find_today_tests(session)
     assignments = find_today_assignments(session)
 
     if not tests and not assignments:
-        await update.message.reply_text("✅ Bugun tugaydigan test yoki topshiriq yo‘q.")
+        await context.bot.send_message(chat_id=chat.id, text="✅ Bugun tugaydigan test yoki topshiriq yo‘q.")
         return
 
     msg = f"❗️ *Kurdoshlar! bugun tugaydigan deadlinelar quyidagilar:*\n\n"
@@ -230,13 +229,19 @@ async def send_today_deadlines(update: Update, context: ContextTypes.DEFAULT_TYP
         for title, subject, deadline, link in assignments:
             msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {deadline}\n👉 {subject}\n\n"
 
-    await update.message.reply_text(msg, parse_mode="Markdown", disable_web_page_preview=True)
+    await context.bot.send_message(chat_id=chat.id, text=msg, parse_mode="Markdown", disable_web_page_preview=True)
 
 
 # === 10. Botni ishga tushirish ===
 async def main():
+    from telegram.ext import filters
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("bugun", send_today_deadlines))
+    app.add_handler(CommandHandler(
+    "bugun",
+    send_today_deadlines,
+    filters.ChatType.GROUPS | filters.ChatType.PRIVATE  # 🔥 yangi qator
+))
+    
     print("✅ Bot ishga tushdi. /bugun deb yozing.")
     await app.run_polling()
 
