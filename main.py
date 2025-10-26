@@ -8,10 +8,14 @@ from datetime import datetime
 nest_asyncio.apply()
 
 # === ⚙️ Sozlamalar ===
-BOT_TOKEN = "8086716853:AAEKBw48xkLITfBQabZVt7iOzL_JaTBAVo8"
-TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
+BOT_TOKEN = "7589991668:AAEsD8Gl9Oat0mM73MNOharnlYfnKHC56q0"
 GLOBAL_EXECUTOR = ThreadPoolExecutor(max_workers=10)
-
+TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
+# Bugungi sana va hafta kunini olish
+now = datetime.now(TASHKENT_TZ)
+weekdays_uz = ["Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba","Yakshanba"]
+bugungi_sana = now.strftime("%d-%m-%Y")
+bugungi_kun = weekdays_uz[now.weekday()]
 
 # === 1. LMS tizimiga kirish ===
 def login_to_lms(username, password):
@@ -201,9 +205,10 @@ def find_today_assignments(session, start_id=6343, end_id=6643):
 # === 9. Telegram xabar yuborish ===
 async def send_today_deadlines(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
+    # 🔹 1️⃣ Vaqtinchalik xabar yuborish
+    temp_msg = await context.bot.send_message(chat_id=chat.id, text="🙋‍♂️ Bugungi deadlinelar tekshirilmoqda..."
+    )
     
-    await context.bot.send_message(chat_id=chat.id, text="🙋‍♂️ Bugungi deadlinelar tekshirilmoqda...")
-
     # 👇 Bu joyda o‘z login-parolingizni kiriting
     session, _, err = login_to_lms("user2200420", "70386881")
     if not session:
@@ -212,12 +217,23 @@ async def send_today_deadlines(update: Update, context: ContextTypes.DEFAULT_TYP
 
     tests = find_today_tests(session)
     assignments = find_today_assignments(session)
+    # 🔹 Temp xabarni o'chirish
+    await temp_msg.delete()
 
     if not tests and not assignments:
-        await context.bot.send_message(chat_id=chat.id, text="✅ Bugun tugaydigan test yoki topshiriq yo‘q.")
+        now = datetime.now(TASHKENT_TZ)
+        weekdays_uz = ["Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba","Yakshanba"]
+        bugungi_sana = now.strftime("%d-%m-%Y")
+        bugungi_kun = weekdays_uz[now.weekday()]
+
+        await context.bot.send_message(
+            chat_id=chat.id, 
+            text=f"✅ Bugun tugaydigan test yoki topshiriq yo‘q.\n({bugungi_sana}, {bugungi_kun})"
+            )
+
         return
 
-    msg = f"❗️ *Kurdoshlar! bugun tugaydigan deadlinelar quyidagilar:*\n\n"
+    msg = f"❗️ *Bugun quyidagi vazifalar vaqti tugaydi*:\n\n"
 
     if tests:
         
