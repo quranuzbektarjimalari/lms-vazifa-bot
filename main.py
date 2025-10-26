@@ -228,7 +228,7 @@ async def send_today_deadlines(update: Update, context: ContextTypes.DEFAULT_TYP
 
         await context.bot.send_message(
             chat_id=chat.id, 
-            text=f"✅ Bugun tugaydigan test yoki topshiriq yo‘q.\n({bugungi_sana}, {bugungi_kun})"
+            text=f"✅ Bugun vaqti tugaydigan vazifa YO‘Q!.\n({bugungi_sana}, {bugungi_kun})"
             )
 
         return
