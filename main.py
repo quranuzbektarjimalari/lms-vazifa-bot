@@ -8,7 +8,7 @@ from datetime import datetime
 nest_asyncio.apply()
 
 # === ⚙️ Sozlamalar ===
-BOT_TOKEN = "7589991668:AAEsD8Gl9Oat0mM73MNOharnlYfnKHC56q0"
+BOT_TOKEN = "8086716853:AAEKBw48xkLITfBQabZVt7iOzL_JaTBAVo8"
 GLOBAL_EXECUTOR = ThreadPoolExecutor(max_workers=10)
 TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
 # Bugungi sana va hafta kunini olish
