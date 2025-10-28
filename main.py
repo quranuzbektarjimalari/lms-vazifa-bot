@@ -5,6 +5,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from datetime import datetime
 
+
 nest_asyncio.apply()
 
 # === ⚙️ Sozlamalar ===
@@ -86,70 +87,85 @@ def extract_subject_fast(soup):
 
 
 
-# === 2. HEAD bilan mavjudlikni tekshirish ===
-def fast_check_exists(session, url):
-    try:
-        r = session.head(url, timeout=3)
-        return r.status_code == 200
-    except:
+# === 2. HEAD bilan mavjudlikni tekshirish (ishonchliroq) ===
+def fast_check_exists(session, url, retries=3):
+    for attempt in range(retries):
         try:
-            r = session.get(url, timeout=3)
-            return r.status_code == 200
-        except:
-            return False
+            r = session.head(url, timeout=7)
+            if r.status_code == 200:
+                return True
+            else:
+                # HEAD ishlamasa GET
+                r = session.get(url, timeout=7)
+                if r.status_code == 200:
+                    return True
+        except Exception as e:
+            
+            if attempt == retries - 1:
+                return False
+            continue
+    return False
 
 
 
-# === 4. Test sahifasini tekshirish ===
-def check_test(session, url):
-    try:
-        if not fast_check_exists(session, url):
-            return None
-        r = session.get(url, timeout=8)
-        if r.status_code != 200:
-            return None
-        soup = BeautifulSoup(r.text, "html.parser")
+# === 4 va 5: check_test va check_assignment exceptionlarni loglash ===
+def check_test(session, url, retries=3):
+    for attempt in range(retries):
+        try:
+            if not fast_check_exists(session, url):
+                return None
+            r = session.get(url, timeout=10)
+            r.raise_for_status()
+            soup = BeautifulSoup(r.text, "html.parser")
 
-        title = soup.find("h3", class_="page-title")
-        title = title.get_text(strip=True) if title else "Noma’lum test"
+            title_tag = soup.find("h3", class_="page-title")
+            title = title_tag.get_text(strip=True) if title_tag else "Noma’lum test"
 
-        strong = soup.find("strong", string=lambda s: s and "Tugallanish vaqti" in s)
-        deadline = "-"
-        if strong:
-            span = strong.find_next("span", class_="text-primary")
-            if span:
-                deadline = span.get_text(strip=True)
+            strong = soup.find("strong", string=lambda s: s and "Tugallanish vaqti" in s)
+            deadline = "-"
+            if strong:
+                span = strong.find_next("span", class_="text-primary")
+                if span:
+                    deadline = span.get_text(strip=True)
 
-        subject = extract_subject_fast(soup)
-        return (title, subject, deadline, url)
-    except:
-        return None
+            subject = extract_subject_fast(soup)
+            return (title, subject, deadline, url)
+        except Exception as e:
+            
+            if attempt == retries - 1:
+                return None
+            continue
 
+# === check_assignment + retry ===
+def check_assignment(session, url, retries=3):
+    for attempt in range(retries):
+        try:
+            if not fast_check_exists(session, url):
+                return None
+            r = session.get(url, timeout=10)
+            r.raise_for_status()
+            soup = BeautifulSoup(r.text, "html.parser")
 
-# === 5. Topshiriq sahifasini tekshirish ===
-def check_assignment(session, url):
-    try:
-        if not fast_check_exists(session, url):
-            return None
-        r = session.get(url, timeout=8)
-        if r.status_code != 200:
-            return None
-        soup = BeautifulSoup(r.text, "html.parser")
+            title = "Noma’lum topshiriq"
+            for p in soup.find_all("p", class_="header-title"):
+                span = p.find("span")
+                if span and "Topshiriq nomi" in span.get_text(strip=True):
+                    title = p.get_text(" ", strip=True).replace("Topshiriq nomi:", "").strip()
 
-        title = "Noma’lum topshiriq"
-        for p in soup.find_all("p", class_="header-title"):
-            if p.find("span") and "Topshiriq nomi" in p.find("span").get_text(strip=True):
-                title = p.get_text(" ", strip=True).replace("Topshiriq nomi:", "").strip()
+            deadline = "-"
+            for p in soup.find_all("p", class_="header-title"):
+                span = p.find("span")
+                if span and "Topshiriq muddati" in span.get_text(strip=True):
+                    deadline = p.get_text(" ", strip=True).replace("Topshiriq muddati", "").strip()
 
-        deadline = "-"
-        for p in soup.find_all("p", class_="header-title"):
-            if p.find("span") and "Topshiriq muddati" in p.find("span").get_text(strip=True):
-                deadline = p.get_text(" ", strip=True).replace("Topshiriq muddati", "").strip()
+            subject = extract_subject_fast(soup)
+            return (title, subject, deadline, url)
+        except Exception as e:
+            
+            if attempt == retries - 1:
+                return None
+            continue
 
-        subject = extract_subject_fast(soup)
-        return (title, subject, deadline, url)
-    except:
-        return None
 
 
 # === 6. Bugungi sana bilan solishtirish ===
@@ -228,7 +244,7 @@ async def send_today_deadlines(update: Update, context: ContextTypes.DEFAULT_TYP
 
         await context.bot.send_message(
             chat_id=chat.id, 
-            text=f"✅ Bugun vaqti tugaydigan vazifa yo‘q! \n({bugungi_sana}, {bugungi_kun})"
+            text=f"✅ Bugun tugaydigan test yoki topshiriq yo‘q! \n({bugungi_sana}, {bugungi_kun})"
             )
 
         return
