@@ -306,14 +306,16 @@ async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("bugun", send_today_deadlines, filters.ChatType.GROUPS | filters.ChatType.PRIVATE))
 
-    # 🕔 Har kuni 17:06 da avtomatik yuborish
-    app.job_queue.run_daily(
+    # 🕔 Har kuni 17:15 da avtomatik yuborish
+    job_queue = app.job_queue
+    job_queue.run_daily(
         send_scheduled_message,
-        time=dtime(hour=17, minute=15, tzinfo=TASHKENT_TZ)
+        time=dtime(hour=17, minute=20, tzinfo=TASHKENT_TZ)
     )
 
     print("✅ Bot ishga tushdi. /bugun deb yozing.")
     await app.run_polling()
+
 
 
 
