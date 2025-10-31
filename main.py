@@ -221,19 +221,28 @@ def find_today_assignments(session, start_id=6343, end_id=6643):
 
 # === 9. Telegram xabar yuborish ===
 async def send_today_deadlines(update: Update = None, context: ContextTypes.DEFAULT_TYPE = None, auto=False):
+    """
+    /bugun komandasi uchun update mavjud bo'ladi,
+    ammo scheduler ishga tushganda esa faqat guruhga yuboradi.
+    """
+    # 🔹 Guruhda yoki foydalanuvchi chatida yuboriladigan joyni aniqlaymiz
     chat_id = GROUP_CHAT_ID if auto else update.effective_chat.id
 
+    # Faqat /bugun komandasi uchun vaqtinchalik xabar yuboramiz
     if not auto:
         temp_msg = await context.bot.send_message(chat_id=chat_id, text="🙋‍♂️ Bugungi deadlinelar tekshirilmoqda...")
 
+    # LMS tizimiga kirish
     session, _, err = login_to_lms("user2200420", "70386881")
     if not session:
         await context.bot.send_message(chat_id=chat_id, text=f"❌ LMS ga kirishda xato: {err}")
         return
 
+    # Test va topshiriqlarni topish
     tests = find_today_tests(session)
     assignments = find_today_assignments(session)
 
+    # /bugun komandasi uchun vaqtinchalik xabarni o'chiramiz
     if not auto:
         await temp_msg.delete()
 
@@ -262,25 +271,38 @@ async def send_today_deadlines(update: Update = None, context: ContextTypes.DEFA
         for title, subject, deadline, link in assignments:
             msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {deadline}\n👉 {subject}\n\n"
 
-    await context.bot.send_message(chat_id=chat.id, text=msg, parse_mode="Markdown", disable_web_page_preview=True)
+    await context.bot.send_message(chat_id=chat_id, text=msg, parse_mode="Markdown", disable_web_page_preview=True)
 
 
 # === 10. Botni ishga tushirish ===
 async def main():
     from telegram.ext import filters
+
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # 🔹 /bugun komandasi
-    app.add_handler(CommandHandler("bugun", send_today_deadlines, filters.ChatType.GROUPS | filters.ChatType.PRIVATE))
+    # /bugun komandasi uchun handler
+    app.add_handler(CommandHandler(
+        "bugun",
+        send_today_deadlines,
+        filters.ChatType.GROUPS | filters.ChatType.PRIVATE
+    ))
 
-    # 🔹 Har kuni 05:00 da avtomatik yuborish
+    # === Scheduler ===
     scheduler = AsyncIOScheduler(timezone=TASHKENT_TZ)
-    scheduler.add_job(send_today_deadlines, "cron", hour=17, minute=55, args=[None, app.bot, True])
+
+    # Har kuni soat 05:00 da avtomatik guruhga yuboradi
+    scheduler.add_job(
+        send_today_deadlines,
+        trigger="cron",
+        hour=18,
+        minute=5,
+        args=[None, app.bot, True]  # auto=True → faqat guruhga yuboriladi
+    )
+
     scheduler.start()
 
-    print("✅ Bot ishga tushdi. /bugun yoki avtomatik 05:00 kuting.")
+    print("✅ Bot ishga tushdi. /bugun deb yozing yoki 05:00 da avtomatik xabar yuboriladi.")
     await app.run_polling()
-
 
 if __name__ == "__main__":
     asyncio.run(main())
