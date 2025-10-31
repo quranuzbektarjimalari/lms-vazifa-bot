@@ -265,70 +265,56 @@ async def send_today_deadlines(update: Update, context: ContextTypes.DEFAULT_TYP
     await context.bot.send_message(chat_id=chat.id, text=msg, parse_mode="Markdown", disable_web_page_preview=True)
 
 
-async def scheduled_send(app):
-    """Har kuni ertalab 05:00 da xabar yuboradi"""
-    while True:
-        now = datetime.now(TASHKENT_TZ)
-        next_run = datetime.combine(now.date(), time(17, 6, 0, tzinfo=TASHKENT_TZ))
+from datetime import time as dtime  # time bilan chalkashmaslik uchun
 
-        # Agar bugun 05:00 allaqachon o‘tgan bo‘lsa — ertangi 05:00 ni kutamiz
-        if now > next_run:
-            next_run += timedelta(days=1)
+async def send_scheduled_message(context: ContextTypes.DEFAULT_TYPE):
+    """Har kuni 17:06 da guruhga xabar yuboradi"""
+    app = context.application
+    try:
+        session, _, err = login_to_lms("user2200420", "70386881")
+        if not session:
+            await app.bot.send_message(chat_id=GROUP_CHAT_ID, text=f"❌ LMS ga kirishda xato: {err}")
+            return
 
-        wait_seconds = (next_run - now).total_seconds()
-        
-        await asyncio.sleep(wait_seconds)
+        tests = find_today_tests(session)
+        assignments = find_today_assignments(session)
 
-        try:
-            # --- Quyidagi kod send_today_deadlines() bilan bir xil ishni bajaradi ---
-            session, _, err = login_to_lms("user2200420", "70386881")
-            if not session:
-                await app.bot.send_message(chat_id=GROUP_CHAT_ID, text=f"❌ LMS ga kirishda xato: {err}")
-                continue
+        if not tests and not assignments:
+            now = datetime.now(TASHKENT_TZ)
+            weekdays_uz = ["Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba","Yakshanba"]
+            bugungi_sana = now.strftime("%d-%m-%Y")
+            bugungi_kun = weekdays_uz[now.weekday()]
+            await app.bot.send_message(
+                chat_id=GROUP_CHAT_ID,
+                text=f"✅ Bugun tugaydigan test yoki topshiriq yo‘q!\n({bugungi_sana}, {bugungi_kun})"
+            )
+            return
 
-            tests = find_today_tests(session)
-            assignments = find_today_assignments(session)
+        msg = "❗️ *Bugun quyidagi vazifalar vaqti tugaydi*:\n\n"
+        for title, subject, deadline, link in tests:
+            msg += f"📘 *Test:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {deadline}\n👉 {subject}\n\n"
+        for title, subject, deadline, link in assignments:
+            msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {deadline}\n👉 {subject}\n\n"
 
-            if not tests and not assignments:
-                now = datetime.now(TASHKENT_TZ)
-                weekdays_uz = ["Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba","Yakshanba"]
-                bugungi_sana = now.strftime("%d-%m-%Y")
-                bugungi_kun = weekdays_uz[now.weekday()]
-                await app.bot.send_message(
-                    chat_id=GROUP_CHAT_ID,
-                    text=f"✅ Bugun tugaydigan test yoki topshiriq yo‘q! \n({bugungi_sana}, {bugungi_kun})"
-                )
-                continue
-
-            msg = f"❗️ *Bugun quyidagi vazifalar vaqti tugaydi*:\n\n"
-            if tests:
-                for title, subject, deadline, link in tests:
-                    msg += f"📘 *Test:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {deadline}\n👉 {subject}\n\n"
-            if assignments:
-                for title, subject, deadline, link in assignments:
-                    msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {deadline}\n👉 {subject}\n\n"
-
-            await app.bot.send_message(chat_id=GROUP_CHAT_ID, text=msg, parse_mode="Markdown", disable_web_page_preview=True)
-
-        except Exception as e:
-            await app.bot.send_message(chat_id=GROUP_CHAT_ID, text=f"⚠️ Avtomatik xabarda xato: {e}")
+        await app.bot.send_message(chat_id=GROUP_CHAT_ID, text=msg, parse_mode="Markdown", disable_web_page_preview=True)
+    except Exception as e:
+        await app.bot.send_message(chat_id=GROUP_CHAT_ID, text=f"⚠️ Avtomatik xabarda xato: {e}")
 
 
-# === 10. Botni ishga tushirish ===
 async def main():
     from telegram.ext import filters
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler(
-        "bugun",
-        send_today_deadlines,
-        filters.ChatType.GROUPS | filters.ChatType.PRIVATE
-    ))
+    app.add_handler(CommandHandler("bugun", send_today_deadlines, filters.ChatType.GROUPS | filters.ChatType.PRIVATE))
 
-    # 🆕 Avtomatik 05:00 funksiyasini fon jarayon sifatida ishga tushiramiz
-    asyncio.create_task(scheduled_send(app))
-    
+    # 🕔 Har kuni 17:06 da avtomatik yuborish
+    app.job_queue.run_daily(
+        send_scheduled_message,
+        time=dtime(hour=17, minute=15, tzinfo=TASHKENT_TZ)
+    )
+
     print("✅ Bot ishga tushdi. /bugun deb yozing.")
     await app.run_polling()
+
 
 
 if __name__ == "__main__":
