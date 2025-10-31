@@ -3,16 +3,16 @@ from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from datetime import datetime, time, timedelta
-
+from datetime import datetime
+from apscheduler.schedulers.asyncio import AsyncIOScheduler  # 🕒 Qo‘shildi!
 
 nest_asyncio.apply()
 
 # === ⚙️ Sozlamalar ===
 BOT_TOKEN = "8086716853:AAEKBw48xkLITfBQabZVt7iOzL_JaTBAVo8"
 GLOBAL_EXECUTOR = ThreadPoolExecutor(max_workers=10)
+GROUP_CHAT_ID = -1001899369217   # Guruh ID
 TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
-GROUP_CHAT_ID = -1001899369217
 # Bugungi sana va hafta kunini olish
 now = datetime.now(TASHKENT_TZ)
 weekdays_uz = ["Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba","Yakshanba"]
@@ -220,22 +220,22 @@ def find_today_assignments(session, start_id=6343, end_id=6643):
 
 
 # === 9. Telegram xabar yuborish ===
-async def send_today_deadlines(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat = update.effective_chat
-    # 🔹 1️⃣ Vaqtinchalik xabar yuborish
-    temp_msg = await context.bot.send_message(chat_id=chat.id, text="🙋‍♂️ Bugungi deadlinelar tekshirilmoqda..."
-    )
-    
-    # 👇 Bu joyda o‘z login-parolingizni kiriting
+async def send_today_deadlines(update: Update = None, context: ContextTypes.DEFAULT_TYPE = None, auto=False):
+    chat_id = GROUP_CHAT_ID if auto else update.effective_chat.id
+
+    if not auto:
+        temp_msg = await context.bot.send_message(chat_id=chat_id, text="🙋‍♂️ Bugungi deadlinelar tekshirilmoqda...")
+
     session, _, err = login_to_lms("user2200420", "70386881")
     if not session:
-        await context.bot.send_message(chat_id=chat.id, text=f"❌ LMS ga kirishda xato: {err}")
+        await context.bot.send_message(chat_id=chat_id, text=f"❌ LMS ga kirishda xato: {err}")
         return
 
     tests = find_today_tests(session)
     assignments = find_today_assignments(session)
-    # 🔹 Temp xabarni o'chirish
-    await temp_msg.delete()
+
+    if not auto:
+        await temp_msg.delete()
 
     if not tests and not assignments:
         now = datetime.now(TASHKENT_TZ)
@@ -264,55 +264,22 @@ async def send_today_deadlines(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await context.bot.send_message(chat_id=chat.id, text=msg, parse_mode="Markdown", disable_web_page_preview=True)
 
-from datetime import time as dtime # time bilan chalkashmaslik uchun
 
-async def send_scheduled_message(context: ContextTypes.DEFAULT_TYPE):
-    bot = context.bot
-    try:
-        session, _, err = login_to_lms("user2200420", "70386881")
-        if not session:
-            await bot.send_message(chat_id=GROUP_CHAT_ID, text=f"❌ LMS ga kirishda xato: {err}")
-            return
-        tests = find_today_tests(session)
-        assignments = find_today_assignments(session)
-
-        if not tests and not assignments:
-            now = datetime.now(TASHKENT_TZ)
-            weekdays_uz = ["Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba","Yakshanba"]
-            bugungi_sana = now.strftime("%d-%m-%Y")
-            bugungi_kun = weekdays_uz[now.weekday()]
-            await app.bot.send_message(
-                chat_id=GROUP_CHAT_ID,
-                text=f"✅ Bugun tugaydigan test yoki topshiriq yo‘q!\n({bugungi_sana}, {bugungi_kun})"
-            )
-            return
-
-        msg = "❗️ *Bugun quyidagi vazifalar vaqti tugaydi*:\n\n"
-        for title, subject, deadline, link in tests:
-            msg += f"📘 *Test:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {deadline}\n👉 {subject}\n\n"
-        for title, subject, deadline, link in assignments:
-            msg += f"📕 *Topshiriq:* *{title}* ([ko‘rish]({link}))\n🕒 Tugash: {deadline}\n👉 {subject}\n\n"
-
-        await app.bot.send_message(chat_id=GROUP_CHAT_ID, text=msg, parse_mode="Markdown", disable_web_page_preview=True)
-    except Exception as e:
-        await app.bot.send_message(chat_id=GROUP_CHAT_ID, text=f"⚠️ Avtomatik xabarda xato: {e}")
-
-
+# === 10. Botni ishga tushirish ===
 async def main():
     from telegram.ext import filters
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    # 🔹 /bugun komandasi
     app.add_handler(CommandHandler("bugun", send_today_deadlines, filters.ChatType.GROUPS | filters.ChatType.PRIVATE))
 
-    job_queue = app.job_queue
-    job_queue.run_daily(
-        send_scheduled_message,
-        time=dtime(hour=17, minute=35, tzinfo=TASHKENT_TZ)
-    )
+    # 🔹 Har kuni 05:00 da avtomatik yuborish
+    scheduler = AsyncIOScheduler(timezone=TASHKENT_TZ)
+    scheduler.add_job(send_today_deadlines, "cron", hour=17, minute=53, args=[None, app.bot, True])
+    scheduler.start()
 
-    print("✅ Bot ishga tushdi. /bugun deb yozing.")
+    print("✅ Bot ishga tushdi. /bugun yoki avtomatik 05:00 kuting.")
     await app.run_polling()
-
-
 
 
 if __name__ == "__main__":
