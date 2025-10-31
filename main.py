@@ -264,18 +264,15 @@ async def send_today_deadlines(update: Update, context: ContextTypes.DEFAULT_TYP
 
     await context.bot.send_message(chat_id=chat.id, text=msg, parse_mode="Markdown", disable_web_page_preview=True)
 
-
-from datetime import time as dtime  # time bilan chalkashmaslik uchun
+from datetime import time as dtime # time bilan chalkashmaslik uchun
 
 async def send_scheduled_message(context: ContextTypes.DEFAULT_TYPE):
-    """Har kuni 17:06 da guruhga xabar yuboradi"""
-    app = context.application
+    bot = context.bot
     try:
         session, _, err = login_to_lms("user2200420", "70386881")
         if not session:
-            await app.bot.send_message(chat_id=GROUP_CHAT_ID, text=f"❌ LMS ga kirishda xato: {err}")
+            await bot.send_message(chat_id=GROUP_CHAT_ID, text=f"❌ LMS ga kirishda xato: {err}")
             return
-
         tests = find_today_tests(session)
         assignments = find_today_assignments(session)
 
@@ -306,11 +303,10 @@ async def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("bugun", send_today_deadlines, filters.ChatType.GROUPS | filters.ChatType.PRIVATE))
 
-    # 🕔 Har kuni 17:15 da avtomatik yuborish
     job_queue = app.job_queue
     job_queue.run_daily(
         send_scheduled_message,
-        time=dtime(hour=17, minute=20, tzinfo=TASHKENT_TZ)
+        time=dtime(hour=17, minute=35, tzinfo=TASHKENT_TZ)
     )
 
     print("✅ Bot ishga tushdi. /bugun deb yozing.")
