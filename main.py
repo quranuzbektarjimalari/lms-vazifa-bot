@@ -275,7 +275,7 @@ async def main():
 
     # 🔹 Har kuni 05:00 da avtomatik yuborish
     scheduler = AsyncIOScheduler(timezone=TASHKENT_TZ)
-    scheduler.add_job(send_today_deadlines, "cron", hour=17, minute=53, args=[None, app.bot, True])
+    scheduler.add_job(send_today_deadlines, "cron", hour=17, minute=55, args=[None, app.bot, True])
     scheduler.start()
 
     print("✅ Bot ishga tushdi. /bugun yoki avtomatik 05:00 kuting.")
