@@ -3,7 +3,8 @@ from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from datetime import datetime
+from datetime import datetime, time
+GROUP_CHAT_ID = -1001899369217  # shu yerga o‘z guruh chat_id sini yozing
 
 
 nest_asyncio.apply()
@@ -12,11 +13,12 @@ nest_asyncio.apply()
 BOT_TOKEN = "8086716853:AAEKBw48xkLITfBQabZVt7iOzL_JaTBAVo8"
 GLOBAL_EXECUTOR = ThreadPoolExecutor(max_workers=10)
 TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
-# Bugungi sana va hafta kunini olish
-now = datetime.now(TASHKENT_TZ)
-weekdays_uz = ["Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba","Yakshanba"]
-bugungi_sana = now.strftime("%d-%m-%Y")
-bugungi_kun = weekdays_uz[now.weekday()]
+
+# === Sana uchun yordamchi ===
+def get_today_info():
+    now = datetime.now(TASHKENT_TZ)
+    weekdays_uz = ["Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba","Yakshanba"]
+    return now.strftime("%d-%m-%Y"), weekdays_uz[now.weekday()]
 
 # === 1. LMS tizimiga kirish ===
 def login_to_lms(username, password):
@@ -264,18 +266,28 @@ async def send_today_deadlines(update: Update, context: ContextTypes.DEFAULT_TYP
     await context.bot.send_message(chat_id=chat.id, text=msg, parse_mode="Markdown", disable_web_page_preview=True)
 
 
-# === 10. Botni ishga tushirish ===
+# === Har kuni 05:00 da avtomatik yuborish ===
+async def auto_send_daily(context: ContextTypes.DEFAULT_TYPE):
+    # Shu yerda yangiliklarni avtomatik tekshiradi va yuboradi
+    class DummyUpdate:
+        effective_chat = type("Chat", (), {"id": GROUP_CHAT_ID})()
+    await send_today_deadlines(DummyUpdate(), context)
+
+
+# === Botni ishga tushirish ===
 async def main():
-    from telegram.ext import filters
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler(
-    "bugun",
-    send_today_deadlines,
-    filters.ChatType.GROUPS | filters.ChatType.PRIVATE  # 🔥 yangi qator
-))
-    
-    print("✅ Bot ishga tushdi. /bugun deb yozing.")
+    job_queue = app.job_queue
+
+    # /bugun komandasi uchun handler
+    app.add_handler(CommandHandler("bugun", send_today_deadlines))
+
+    # Har kuni 05:00 da avtomatik yuborish (sinov uchun vaqtni o‘zgartir)
+    job_queue.run_daily(auto_send_daily, time=time(hour=5, minute=0, tzinfo=TASHKENT_TZ))
+
+    print("✅ Bot ishga tushdi. /bugun komandasi ishlaydi va har kuni 05:00 da avtomatik xabar yuboradi.")
     await app.run_polling()
+
 
 
 if __name__ == "__main__":
