@@ -249,7 +249,7 @@ async def send_today_deadlines(update: Update, context: ContextTypes.DEFAULT_TYP
 
         return
 
-    msg = f"❗️ *Bugun quyidagi vazifalar vaqti tugaydi*:\n\n"
+    msg = f"❗️ *DEADLINE*\n\n*Quyidagi vazifalar bugun tugaydi*:\n\n"
 
     if tests:
         
