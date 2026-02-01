@@ -54,13 +54,12 @@ def login_to_lms(username, password):
         return None, None, str(e)
 
 SUBJECT_LINKS = {
-    "826-27-uz": "Kalom ilmi tarixi va nazariyasi II",
-    "827-27-uz": "Islom manbashunosligi",
-    "828-27-uz": "Moturidiya ta’limotiga oid manbalar",
-    "829-27-uz": "Tasavvuf II",
-    "830-27-uz": "Islom falsafasi",
-    "831-27-uz": "Arab tilining nazariy grammatikasi",
-    "832-27-uz": "Mantiq ilmi asoslari"
+    "833-28-uz": "Din sotsiologiyasi",
+    "834-28-uz": "Din psixologiyasi",
+    "835-28-uz": "Tafsir matnlari",
+    "836-28-uz": "Tasavvufiy tafsirlar",
+    "837-28-uz": "Hanafiylikdagi aqidaviy matnlar sharhlari",
+    "838-28-uz": "Qur'on navhi"
 }
 
 def extract_subject_fast(soup):
@@ -193,7 +192,7 @@ def is_today(deadline_str):
 
 
 # === 7. Bugungi testlarni topish ===
-def find_today_tests(session, start_id=1004, end_id=1304):
+def find_today_tests(session, start_id=1110, end_id=1410):
     base_url = "https://lms.iiau.uz/student/my-course/calendar/resource/test/"
     results = []
     urls = [f"{base_url}{i}" for i in range(start_id, end_id + 1)]
@@ -206,7 +205,7 @@ def find_today_tests(session, start_id=1004, end_id=1304):
 
 
 # === 8. Bugungi topshiriqlarni topish ===
-def find_today_assignments(session, start_id=6343, end_id=6643):
+def find_today_assignments(session, start_id=6500, end_id=6800):
     base_url = "https://lms.iiau.uz/student/my-course/calendar/resource/activity/standard-"
     results = []
     urls = [f"{base_url}{i}" for i in range(start_id, end_id + 1)]
